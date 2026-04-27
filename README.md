@@ -6,7 +6,7 @@ Industrial dashboard for PPI AIME 8U modules via Modbus TCP. Features a high-spe
 <p align="center">
   <img src="https://github.com/user-attachments/assets/73f302e5-7978-4826-ac0b-2a1b0830afc3" width="30%" />
   <img src="https://github.com/user-attachments/assets/512dc1fa-2553-437b-831a-ec2c97c7f8e9" width="30%" />
-    <img src="https://github.com/user-attachments/assets/397cdd9f-c527-434e-9b64-a5e3d07cc7e7" width="30%" />
+  <img src="https://github.com/user-attachments/assets/397cdd9f-c527-434e-9b64-a5e3d07cc7e7" width="30%" />
 </p>
 
 # Milma Malappuram — AIME 8U Dashboard
