@@ -1,0 +1,27 @@
+{# History table rows fragment + pager. Expects: rows (list of _Row with ts_local + ch[8]), page, has_next, query_str #}
+<table class="history-table" id="history-table">
+  <thead id="history-thead"></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.ts_local }}</td>
+      {% for v in r.ch %}
+        <td class="num">{% if v is not none %}{{ "%.2f"|format(v) }}{% else %}—{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% else %}
+    <tr><td colspan="{{ colspan or 9 }}"><em>No rows in this range.</em></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pager">
+  {% if page > 1 %}
+    <button hx-get="/partials/history-rows?{{ query_str }}&page={{ page - 1 }}"
+            hx-target="#history-rows" hx-swap="innerHTML">← Prev</button>
+  {% endif %}
+  <span>Page {{ page }}</span>
+  {% if has_next %}
+    <button hx-get="/partials/history-rows?{{ query_str }}&page={{ page + 1 }}"
+            hx-target="#history-rows" hx-swap="innerHTML">Next →</button>
+  {% endif %}
+</div>

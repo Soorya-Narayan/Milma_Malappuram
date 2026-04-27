@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% set page = "live" %}
+{% block title %}Live · Milma Malappuram{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2 class="page-title">Live Monitor</h2>
+    <p class="page-sub">All channels update every second via WebSocket. <span class="legend ok">Black</span> = ok · <span class="legend alarm">Amber</span> = alarm · <span class="legend err">Red</span> = sensor fault.</p>
+  </div>
+</div>
+
+<div class="device-grid">
+  {% for device in devices %}
+    {% set snap = snap_by_device.get(device.id) %}
+    {% set diag = diag_by_device.get(device.id) %}
+    {% include "partials/device_card.html" %}
+  {% endfor %}
+</div>
+{% endblock %}

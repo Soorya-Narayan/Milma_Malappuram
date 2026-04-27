@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% set page = "about" %}
+{% block title %}About · Milma AIME{% endblock %}
+{% block content %}
+<h2>About this dashboard</h2>
+
+<section class="settings-section">
+  <h3 style="margin-bottom:0.4rem;">What this is</h3>
+  <p>
+    A web-based monitoring dashboard for the
+    <strong>PPI AIME 8U</strong> 8-channel universal analog input module at
+    the Milma Malappuram dairy facility. It polls the RTU over Modbus
+    TCP/IP once per second, stores readings in a local database, and
+    serves a live view, historical trends, a tabular history, and Excel
+    export in the browser.
+  </p>
+</section>
+
+<section class="settings-section">
+  <h3 style="margin-bottom:0.4rem;">How to use it</h3>
+  <ol style="margin:0; padding-left:1.2rem; line-height:1.7;">
+    <li>
+      <strong>Live</strong> — the home page. Shows the eight channel
+      tiles, their present value (PV) and alarm state
+      (<em>HiHi / Hi / Lo / LoLo</em>) updated every second over a
+      WebSocket. Tile colour means:
+      <ul style="margin:0.3rem 0 0.4rem 1rem;">
+        <li><strong>Black (OK)</strong> — reading is within limits.</li>
+        <li><strong>Amber</strong> — at least one alarm bit is active.</li>
+        <li><strong>Red</strong> — sensor fault (open, under-range, over-range, or read failure).</li>
+        <li><strong>Grey / dashed</strong> — no data yet, or channel disabled in Settings.</li>
+      </ul>
+    </li>
+    <li>
+      <strong>Trends</strong> — plot one or more channels over a time
+      range. Pick a preset (Last 1h / 6h / 24h / 7d) or a custom range,
+      and press <em>Plot</em>. Toggle individual series on/off with the
+      check-boxes above the chart. Hover the chart to read exact values.
+    </li>
+    <li>
+      <strong>History</strong> — pivoted table of raw readings, one
+      column per enabled channel. Pick a range and press
+      <em>Search</em>. Use <em>Export .xlsx</em> to download the exact
+      same view as an Excel file. The download file name includes the
+      selected time range.
+    </li>
+    <li>
+      <strong>Settings</strong> — change the theme (dark / light), set
+      how often readings are written to the database (<em>Logging
+      cycle</em>), rename channels, turn off channels you aren't using
+      (disabled channels are not logged, trended, or exported), and
+      manage data retention.
+    </li>
+    <li>
+      <strong>Data retention</strong> — use the red button in Settings
+      to manually delete everything older than 6 months, or tick
+      <em>Auto-delete data older than 6 months</em> to have it run
+      automatically every night at 03:00 local time.
+    </li>
+  </ol>
+</section>
+
+<section class="settings-section">
+  <h3 style="margin-bottom:0.4rem;">Status indicator</h3>
+  <p>
+    The small green dot in the top-right of the navigation bar means
+    the browser is connected to the server over WebSocket and Live
+    values are streaming. If it turns off or grey, Live tiles go
+    <em>stale</em> and the browser will reconnect automatically.
+  </p>
+</section>
+
+<section class="settings-section">
+  <h3 style="margin-bottom:0.4rem;">Support &middot; Goose Solutions</h3>
+  <p style="margin-bottom:0.5rem;">
+    For installation, support, or changes to this dashboard, contact:
+  </p>
+  <ul style="list-style:none; padding:0; margin:0; line-height:1.9;">
+    <li>
+      <strong>Email:</strong>
+      <a href="mailto:jithin@goosesolutions.in">jithin@goosesolutions.in</a>
+    </li>
+    <li>
+      <strong>Phone:</strong>
+      <a href="tel:+918089050020">+91&nbsp;80890&nbsp;50020</a>
+    </li>
+  </ul>
+</section>
+{% endblock %}

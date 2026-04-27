@@ -1,0 +1,23 @@
+{# One device card. Expects: device (DeviceMeta), snap (DeviceSnapshot or None), diag (DeviceDiagnostics or None). #}
+<article class="device-card" data-device-id="{{ device.id }}">
+  <header class="dev-head">
+    <div class="dev-id">
+      <h3>{{ device.name }}</h3>
+      {% if device.location %}<div class="dev-loc">{{ device.location }}</div>{% endif %}
+    </div>
+    <div class="dev-ambient">
+      <span class="ambient-label">Ambient</span>
+      <span class="ambient-value"
+        x-text="(() => { const a = $store.live.ambient({{ device.id }}); return a === null || a === undefined ? '{% if snap and snap.ambient_c is not none %}{{ '%.1f'|format(snap.ambient_c) }}{% else %}—{% endif %}' : (+a).toFixed(1); })()"
+      >{% if snap and snap.ambient_c is not none %}{{ "%.1f"|format(snap.ambient_c) }}{% else %}—{% endif %}</span>
+      <span class="ambient-unit">°C</span>
+    </div>
+  </header>
+
+  <div class="tile-grid">
+    {% for ch in device.channels %}
+      {% set csnap = (snap.channels | selectattr('channel', 'equalto', ch.channel) | list | first) if snap else None %}
+      {% include "partials/channel_tile.html" %}
+    {% endfor %}
+  </div>
+</article>

@@ -1,0 +1,49 @@
+{# One channel tile. Context: device (DeviceMeta), ch (ChannelMeta), csnap (ChannelSnapshot or None). #}
+{% if not ch.enabled %}
+  {# Disabled channel: operator has turned it off in Settings. Render a
+     neutral "OK-colour" tile (no alarm / error tint), show an em-dash,
+     and suppress the alarm pills and live updates. #}
+  <div class="tile tile-disabled">
+    <div class="tile-head">
+      <div class="tile-ch">CH{{ ch.channel }}</div>
+      <div class="tile-name">{{ ch.name }}</div>
+    </div>
+    <div class="tile-value-wrap">
+      <span class="value">—</span>
+      <span class="unit">{{ ch.unit or "" }}</span>
+    </div>
+    <div class="alarms">
+      <span class="al">HiHi</span>
+      <span class="al">Hi</span>
+      <span class="al">Lo</span>
+      <span class="al">LoLo</span>
+    </div>
+  </div>
+{% else %}
+<div
+  class="{% if csnap %}{% if csnap.pv_error and csnap.pv_error != 0 %}tile err{% elif csnap.alarms and csnap.alarms != 0 %}tile alarm{% else %}tile{% endif %}{% else %}tile stale{% endif %}"
+  x-bind:class="(() => { const c = $store.live.channel({{ device.id }}, {{ ch.channel }}); return c ? tileClass(c.pv, c.pv_error, c.alarms) : 'tile stale'; })()"
+>
+  <div class="tile-head">
+    <div class="tile-ch">CH{{ ch.channel }}</div>
+    <div class="tile-name">{{ ch.name }}</div>
+  </div>
+
+  <div class="tile-value-wrap">
+    <span class="value"
+      x-text="(() => { const c = $store.live.channel({{ device.id }}, {{ ch.channel }}); return c ? fmtPv(c.pv, c.pv_error) : '{% if csnap and csnap.pv is not none and (csnap.pv_error or 0) == 0 %}{{ "%.2f"|format(csnap.pv) }}{% else %}—{% endif %}'; })()"
+    >{% if csnap and csnap.pv is not none and (csnap.pv_error or 0) == 0 %}{{ "%.2f"|format(csnap.pv) }}{% else %}—{% endif %}</span>
+    <span class="unit">{{ ch.unit or "" }}</span>
+  </div>
+
+  <div class="alarms"
+    x-data="{ a: 0 }"
+    x-effect="a = ($store.live.channel({{ device.id }}, {{ ch.channel }}) || {alarms: {{ (csnap.alarms if csnap else 0) or 0 }}}).alarms || 0"
+  >
+    <span class="al" :class="(a & 1)  ? 'on' : ''">HiHi</span>
+    <span class="al" :class="(a & 2)  ? 'on' : ''">Hi</span>
+    <span class="al" :class="(a & 4)  ? 'on' : ''">Lo</span>
+    <span class="al" :class="(a & 8)  ? 'on' : ''">LoLo</span>
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,23 @@
+# Caddyfile — optional reverse proxy for the Milma AIME dashboard.
+# See docker-compose.yml for how to enable the `caddy` service.
+# Automatic HTTPS requires DASHBOARD_DOMAIN to resolve to this host and
+# ports 80/443 reachable from the internet (for ACME challenges).
+
+{$DASHBOARD_DOMAIN} {
+    encode zstd gzip
+
+    # Pass WebSocket upgrades through unchanged.
+    reverse_proxy backend:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+    }
+
+    basicauth /* {
+        {$DASHBOARD_USER} {$DASHBOARD_PASSWORD_HASH}
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}

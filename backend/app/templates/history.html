@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% set page = "history" %}
+{% block title %}History · Milma AIME{% endblock %}
+{% block content %}
+<h2>History <small style="font-size:0.7em; color:var(--pico-muted-color);">· times in {{ tz_label }}</small></h2>
+
+<form class="filter-form"
+      x-data="historyForm()"
+      @submit.prevent="submit">
+  <label>
+    Preset
+    <select x-model="preset" @change="applyPreset">
+      <option value="1h">Last 1h</option>
+      <option value="6h">Last 6h</option>
+      <option value="24h" selected>Last 24h</option>
+      <option value="7d">Last 7d</option>
+      <option value="custom">Custom…</option>
+    </select>
+  </label>
+  <label>
+    From
+    <input type="datetime-local" x-model="from_" :disabled="preset !== 'custom'">
+  </label>
+  <label>
+    To
+    <input type="datetime-local" x-model="to" :disabled="preset !== 'custom'">
+  </label>
+  <div class="actions">
+    <button type="submit">
+      <svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Search
+    </button>
+    <a role="button" class="secondary export-btn" :href="exportUrl('xlsx')" download>
+      <svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+      Export .xlsx
+    </a>
+    <a role="button" class="secondary export-btn" :href="exportUrl('csv')" download>
+      <svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>
+      Export .csv
+    </a>
+    <a role="button" class="secondary export-btn" :href="exportUrl('pdf')" download>
+      <svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><text x="7.5" y="17.5" font-size="6" font-weight="700" stroke="none" fill="currentColor" font-family="Arial, sans-serif">PDF</text></svg>
+      Export .pdf
+    </a>
+  </div>
+</form>
+
+<!-- Column header table gets injected so it stays in sync with the row partial -->
+<style>
+  #history-rows table.history-table { width: 100%; }
+  #history-rows table.history-table th,
+  #history-rows table.history-table td { padding: 0.35rem 0.5rem; }
+</style>
+
+<div id="history-rows">
+  <p><em>Loading…</em></p>
+</div>
+
+<script>
+const HEADERS = {{ headers_json | safe }};
+const DEVICE_ID = {{ device_id }};
+
+function historyForm() {
+  return {
+    preset: "24h",
+    from_: "",
+    to: "",
+
+    init() { this.applyPreset(); this.$nextTick(() => this.submit()); },
+
+    applyPreset() {
+      if (this.preset === "custom") return;
+      const map = { "1h": 3600, "6h": 6*3600, "24h": 86400, "7d": 7*86400 };
+      const t = new Date();
+      const f = new Date(t.getTime() - map[this.preset] * 1000);
+      const fmt = (d) => {
+        const p = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+      };
+      this.from_ = fmt(f); this.to = fmt(t);
+    },
+
+    _params() {
+      return new URLSearchParams({
+        device_id: DEVICE_ID,
+        from: new Date(this.from_).toISOString(),
+        to:   new Date(this.to).toISOString(),
+      });
+    },
+    exportUrl(fmt) {
+      return "/api/export." + fmt + "?" + this._params().toString();
+    },
+    async submit() {
+      const qs = this._params().toString();
+      const r = await fetch("/partials/history-rows?" + qs + "&page=1");
+      const html = await r.text();
+      document.getElementById("history-rows").innerHTML = html;
+      injectHistoryThead();
+      htmx.process(document.getElementById("history-rows"));
+    },
+  };
+}
+
+function injectHistoryThead() {
+  const thead = document.getElementById("history-thead");
+  if (!thead) return;
+  const cells = ["Timestamp"].concat(HEADERS).map(h => "<th>" + h + "</th>").join("");
+  thead.innerHTML = "<tr>" + cells + "</tr>";
+}
+
+// Re-inject the thead after every HTMX swap into #history-rows (paging Next/Prev).
+document.body.addEventListener("htmx:afterSwap", (evt) => {
+  const t = evt.target;
+  if (t && (t.id === "history-rows" || t.closest && t.closest("#history-rows"))) {
+    injectHistoryThead();
+  }
+});
+</script>
+{% endblock %}

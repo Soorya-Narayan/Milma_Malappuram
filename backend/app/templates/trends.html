@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% set page = "trends" %}
+{% block title %}Trends · Milma AIME{% endblock %}
+{% block content %}
+<h2>Trends</h2>
+
+<form class="filter-form"
+      x-data="trendForm()"
+      @submit.prevent="submit">
+  <label>
+    Preset
+    <select x-model="preset" @change="applyPreset">
+      <option value="1h">Last 1h</option>
+      <option value="6h">Last 6h</option>
+      <option value="24h" selected>Last 24h</option>
+      <option value="7d">Last 7d</option>
+      <option value="custom">Custom…</option>
+    </select>
+  </label>
+  <label>
+    From
+    <input type="datetime-local" x-model="from_" :disabled="preset !== 'custom'" required>
+  </label>
+  <label>
+    To
+    <input type="datetime-local" x-model="to" :disabled="preset !== 'custom'" required>
+  </label>
+  <label>
+    Interval
+    <select x-model="interval">
+      <option value="auto" selected>auto</option>
+      <option value="raw">raw (1s)</option>
+      <option value="1m">1 min</option>
+      <option value="1h">1 h</option>
+    </select>
+  </label>
+  <div class="actions">
+    <button type="submit">Plot</button>
+  </div>
+</form>
+
+<div class="channel-toggles" style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:0.75rem;"
+     x-data="{}">
+  {% for ch in channels %}
+  <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.85rem; margin:0;">
+    <input type="checkbox" class="ch-toggle" data-ch="{{ ch.channel }}" checked style="margin:0;">
+    <span style="display:inline-block; width:0.8rem; height:0.8rem; border-radius:50%; background: {{ palette[loop.index0] }};"></span>
+    {{ ch.name }}
+  </label>
+  {% endfor %}
+</div>
+
+<div id="chart" class="chart-wrap"></div>
+
+<script>
+const CHANNELS = {{ channels_json | safe }};
+const PALETTE = {{ palette_json | safe }};
+const DEVICE_ID = {{ device_id }};
+
+function trendForm() {
+  return {
+    preset: "24h",
+    from_: "",
+    to: "",
+    interval: "auto",
+    _plot: null,
+
+    init() {
+      this.applyPreset();
+      document.querySelectorAll(".ch-toggle").forEach(cb => {
+        cb.addEventListener("change", () => this.submit());
+      });
+      // On viewport resize, re-fit the uPlot chart to the new container size.
+      // Debounced so a drag-resize doesn't re-render dozens of times.
+      let resizeT = null;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeT);
+        resizeT = setTimeout(() => {
+          if (!this._plot) return;
+          const el = document.getElementById("chart");
+          this._plot.setSize({
+            width: el.clientWidth,
+            height: Math.max(el.clientHeight - 55, 280),
+          });
+        }, 150);
+      });
+      this.$nextTick(() => this.submit());
+    },
+
+    applyPreset() {
+      if (this.preset === "custom") return;
+      const to = new Date();
+      const spans = { "1h": 3600, "6h": 6*3600, "24h": 86400, "7d": 7*86400 };
+      const from = new Date(to.getTime() - spans[this.preset] * 1000);
+      const fmt = (d) => {
+        const p = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+      };
+      this.from_ = fmt(from);
+      this.to = fmt(to);
+    },
+
+    selectedChannels() {
+      return Array.from(document.querySelectorAll(".ch-toggle"))
+        .filter(cb => cb.checked)
+        .map(cb => parseInt(cb.dataset.ch));
+    },
+
+    async submit() {
+      const from = new Date(this.from_).toISOString();
+      const to   = new Date(this.to).toISOString();
+      const chans = this.selectedChannels();
+      const series = [{}];
+      const data = [[]];
+      let effective = null, escalated = false;
+
+      for (const ch of chans) {
+        const p = new URLSearchParams({
+          device_id: DEVICE_ID,
+          channel: ch, from, to, interval: this.interval,
+        });
+        const r = await fetch("/api/history?" + p.toString());
+        if (!r.ok) continue;
+        const body = await r.json();
+        effective = body.effective_interval;
+        escalated = escalated || body.point_cap_exceeded;
+
+        const xs = body.points.map(p => Math.floor(new Date(p.ts).getTime() / 1000));
+        const ys = body.points.map(p => p.pv_avg);
+        if (data[0].length === 0) data[0] = xs;
+        const meta = CHANNELS.find(c => c.channel === ch) || {name: "CH" + ch};
+        data.push(ys);
+        series.push({
+          label: meta.name,
+          stroke: PALETTE[(ch - 1) % PALETTE.length],
+          width: 1.5,
+          spanGaps: false,
+        });
+      }
+
+      // Axis tick labels, "PV" label, and tick marks are canvas-rendered by
+      // uPlot — they can't be styled with CSS, so we pass colours explicitly.
+      // Read from CSS custom properties so the chart follows the active theme.
+      const css       = getComputedStyle(document.documentElement);
+      const AXIS_COLOR = (css.getPropertyValue("--text").trim() || "#ffffff");
+      const isDark     = document.documentElement.getAttribute("data-theme") !== "light";
+      const GRID_COLOR = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+      const TICK_COLOR = isDark ? "rgba(255,255,255,0.4)"  : "rgba(0,0,0,0.4)";
+      const chartEl = document.getElementById("chart");
+      // uPlot renders its per-series legend row below the canvas inside the
+      // same root element. Reserve ~55 px for that row so it isn't clipped
+      // by the body's overflow:hidden. 280 px floor keeps the canvas usable
+      // on very short viewports.
+      const LEGEND_RESERVE = 55;
+      const canvasH = Math.max(chartEl.clientHeight - LEGEND_RESERVE, 280);
+      const opts = {
+        width: chartEl.clientWidth,
+        height: canvasH,
+        series,
+        scales: {
+          x: { time: true },
+          // Y axis is fixed 0..100 — temperature range of interest for the
+          // cold-storage probes. Disable auto-scaling so it never drifts.
+          y: { auto: false, range: [0, 100] },
+        },
+        axes: [
+          {
+            stroke: AXIS_COLOR,
+            grid:   { stroke: GRID_COLOR },
+            ticks:  { stroke: TICK_COLOR },
+          },
+          {
+            label:  "PV",
+            stroke: AXIS_COLOR,
+            grid:   { stroke: GRID_COLOR },
+            ticks:  { stroke: TICK_COLOR },
+          },
+        ],
+      };
+
+      const el = document.getElementById("chart");
+      el.innerHTML = "";
+      this._plot = new uPlot(opts, data, el);
+    },
+  };
+}
+</script>
+{% endblock %}

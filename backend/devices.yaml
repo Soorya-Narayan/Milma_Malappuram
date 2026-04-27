@@ -1,0 +1,28 @@
+# Phase 1 placeholder — Phase 2 will validate + load this into the DB.
+# Single source of truth for RTU configuration. Edit this file and
+# restart the container to change devices/channels.
+
+poll_interval_s: 1.0
+
+retention:
+  raw_days: 7
+  one_min_days: 90
+  one_hour_years: 2
+
+devices:
+  - id: 1
+    name: "Pasteuriser Temperature"
+    host: "192.168.1.20"
+    port: 502
+    unit_id: 1
+    location: "CS-1 Panel"
+    enabled: true
+    channels:
+      - { channel: 1, name: "CH1", unit: "°C" }
+      - { channel: 2, name: "CH2", unit: "°C" }
+      - { channel: 3, name: "CH3", unit: "°C" }
+      - { channel: 4, name: "CH4", unit: "°C" }
+      - { channel: 5, name: "CH5", unit: "°C" }
+      - { channel: 6, name: "CH6", unit: "°C" }
+      - { channel: 7, name: "CH7", unit: "°C" }
+      - { channel: 8, name: "CH8", unit: "°C" }

@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% set page = "usage" %}
+{% block title %}Usage · Milma AIME{% endblock %}
+{% block content %}
+<h2>System usage
+  <small style="font-size:0.7em; color:var(--pico-muted-color);">
+    · updates every 10 s
+  </small>
+</h2>
+
+<div x-data="usagePage()" x-init="init()">
+  <div class="usage-grid">
+
+    <!-- CPU -->
+    <section class="settings-section usage-card">
+      <div class="usage-head">
+        <h3>CPU</h3>
+        <span class="usage-pct" x-text="fmtPct(data.cpu.percent)"></span>
+      </div>
+      <progress max="100" :value="data.cpu.percent"
+                :class="barClass(data.cpu.percent)"></progress>
+      <p class="usage-sub">
+        <span x-text="data.cpu.count"></span> logical core<span x-text="data.cpu.count === 1 ? '' : 's'"></span>
+      </p>
+    </section>
+
+    <!-- RAM -->
+    <section class="settings-section usage-card">
+      <div class="usage-head">
+        <h3>Memory</h3>
+        <span class="usage-pct" x-text="fmtPct(data.memory.percent)"></span>
+      </div>
+      <progress max="100" :value="data.memory.percent"
+                :class="barClass(data.memory.percent)"></progress>
+      <p class="usage-sub">
+        <span x-text="fmtBytes(data.memory.used_bytes)"></span>
+        of <span x-text="fmtBytes(data.memory.total_bytes)"></span>
+        <template x-if="data.swap.total_bytes > 0">
+          <span> · swap <span x-text="fmtPct(data.swap.percent)"></span></span>
+        </template>
+      </p>
+    </section>
+
+    <!-- Storage (data volume) -->
+    <section class="settings-section usage-card">
+      <div class="usage-head">
+        <h3>Storage</h3>
+        <span class="usage-pct" x-text="fmtPct(data.storage.percent)"></span>
+      </div>
+      <progress max="100" :value="data.storage.percent"
+                :class="barClass(data.storage.percent)"></progress>
+      <p class="usage-sub">
+        <span x-text="fmtBytes(data.storage.used_bytes)"></span>
+        of <span x-text="fmtBytes(data.storage.total_bytes)"></span>
+        used
+        · <span x-text="fmtBytes(data.storage.free_bytes)"></span> free
+      </p>
+    </section>
+
+    <!-- Database size (informational) -->
+    <section class="settings-section usage-card">
+      <div class="usage-head">
+        <h3>Database file</h3>
+        <span class="usage-pct" x-text="fmtBytes(data.database.total_bytes)"></span>
+      </div>
+      <p class="usage-sub">
+        aime.db: <span x-text="fmtBytes(data.database.db_bytes)"></span><br>
+        WAL:     <span x-text="fmtBytes(data.database.wal_bytes)"></span>
+      </p>
+      <p class="usage-sub" style="margin-top:0.4rem;">
+        Auto-delete (Settings → Clear old data) keeps the DB trimmed to
+        the last 6 months.
+      </p>
+    </section>
+
+  </div>
+
+  <p x-show="err" x-text="err" style="color:#e05a5a; margin-top:1rem;"></p>
+</div>
+
+<style>
+  .usage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .usage-card { margin: 0; }
+  .usage-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+  }
+  .usage-head h3 { margin: 0; font-size: 1rem; }
+  .usage-pct {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--pico-muted-color);
+  }
+  .usage-card progress {
+    width: 100%;
+    height: 0.75rem;
+    margin: 0;
+  }
+  /* Colour the bar by load. Pico targets ::-webkit-progress-value
+     and ::-moz-progress-bar; both need their own rules. */
+  progress.bar-ok::-webkit-progress-value   { background: #3dd06b; }
+  progress.bar-warn::-webkit-progress-value { background: #e0a040; }
+  progress.bar-crit::-webkit-progress-value { background: #e05a5a; }
+  progress.bar-ok::-moz-progress-bar        { background: #3dd06b; }
+  progress.bar-warn::-moz-progress-bar      { background: #e0a040; }
+  progress.bar-crit::-moz-progress-bar      { background: #e05a5a; }
+
+  .usage-sub {
+    margin: 0.4rem 0 0 0;
+    font-size: 0.85rem;
+    color: var(--pico-muted-color);
+  }
+</style>
+
+<script>
+function usagePage() {
+  return {
+    data: {
+      cpu: { percent: 0, count: 1 },
+      memory: { percent: 0, used_bytes: 0, total_bytes: 0 },
+      swap: { percent: 0, total_bytes: 0 },
+      storage: { percent: 0, used_bytes: 0, total_bytes: 0, free_bytes: 0 },
+      database: { db_bytes: 0, wal_bytes: 0, total_bytes: 0 },
+    },
+    err: "",
+    timer: null,
+    async poll() {
+      try {
+        const r = await fetch("/api/usage");
+        if (!r.ok) { this.err = "HTTP " + r.status; return; }
+        this.data = await r.json();
+        this.err = "";
+      } catch (e) {
+        this.err = "Error: " + e.message;
+      }
+    },
+    init() {
+      this.poll();
+      this.timer = setInterval(() => this.poll(), 10000);
+    },
+    fmtPct(v) {
+      if (v === null || v === undefined) return "--";
+      return v.toFixed(1) + " %";
+    },
+    fmtBytes(n) {
+      if (!n && n !== 0) return "--";
+      const u = ["B", "KB", "MB", "GB", "TB"];
+      let i = 0;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + " " + u[i];
+    },
+    barClass(pct) {
+      if (pct >= 90) return "bar-crit";
+      if (pct >= 70) return "bar-warn";
+      return "bar-ok";
+    },
+  };
+}
+</script>
+{% endblock %}

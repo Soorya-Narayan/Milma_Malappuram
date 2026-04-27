@@ -1,0 +1,62 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: milma-aime-backend:latest
+    container_name: milma-aime-backend
+    platform: linux/arm64
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: ${DATA_DIR:-/data}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: ${TZ:-Asia/Kolkata}
+    ports:
+      # Host 8000 + 9443 are taken by Portainer on this box, so we use 8080:8080.
+      - "8080:8080"
+    volumes:
+      - aime_data:/data
+      - ./backend/devices.yaml:/app/devices.yaml:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/api/health',timeout=2).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Optional reverse proxy with basic auth + automatic HTTPS (Phase 7).
+  # To enable:
+  #   1. Set DASHBOARD_DOMAIN and DASHBOARD_PASSWORD in .env.
+  #   2. Generate a bcrypt hash for the password:
+  #        docker run --rm caddy:2-alpine caddy hash-password --plaintext "$DASHBOARD_PASSWORD"
+  #      and put the hash into .env as DASHBOARD_PASSWORD_HASH (single-quoted).
+  #   3. Uncomment the service block below and re-run `docker compose up -d`.
+  #   4. Remove or close the backend's `ports:` mapping so the dashboard is
+  #      only reachable via Caddy.
+  # ---------------------------------------------------------------------------
+  # caddy:
+  #   image: caddy:2-alpine
+  #   platform: linux/arm64
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - backend
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   environment:
+  #     DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN}
+  #     DASHBOARD_USER: ${DASHBOARD_USER:-operator}
+  #     DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH}
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+
+volumes:
+  aime_data:
+    name: aime_data
+  # caddy_data:
+  # caddy_config:
